@@ -394,6 +394,67 @@ async function testPostClickExitDespiteModal() {
     env.cleanup();
 }
 
+// -------- SCENARIO 8: In-modal Cloudflare Turnstile → wait for human, then auto-continue --------
+async function testInModalCaptcha() {
+    console.log('\n[8] Just Reset modal contains a Turnstile widget → wait, then click after user ticks it');
+    const messages = [];
+    const env = makeSandbox({
+        html: `<!doctype html><html><head><title>JustRunMy</title></head>
+               <body>
+                 <p>FREE APP TIMER 2 days 23:58 until auto-stop ${'lorem '.repeat(20)}</p>
+                 <button id="reset">Reset Timer</button>
+                 <div class="modal" id="modal">
+                   <p>Tired of resetting this timer?</p>
+                   <div class="cf-turnstile">
+                     <iframe id="cf-iframe" src="https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/if/foo.html"></iframe>
+                   </div>
+                   <button id="justreset">Just Reset</button>
+                 </div>
+               </body></html>`,
+        // Past cooldown and past modal-wait, so we're directly at the Just Reset gate.
+        storage: { enabled: true, jrm_last_trigger_time: -30_000 },
+        captureMessages: messages
+    });
+
+    const justReset = env.window.document.getElementById('justreset');
+    justReset.getBoundingClientRect = () => ({ left: 10, top: 10, width: 100, height: 32, right: 110, bottom: 42, x: 10, y: 10 });
+    Object.defineProperty(justReset, 'offsetWidth', { value: 100, configurable: true });
+    Object.defineProperty(justReset, 'offsetHeight', { value: 32, configurable: true });
+    let justResetClicks = 0;
+    justReset.addEventListener('click', () => justResetClicks++);
+
+    // Make the Turnstile iframe "visible" so modalCaptchaPending() picks it up.
+    const cfIframe = env.window.document.getElementById('cf-iframe');
+    Object.defineProperty(cfIframe, 'offsetWidth', { value: 300, configurable: true });
+    Object.defineProperty(cfIframe, 'offsetHeight', { value: 65, configurable: true });
+
+    await flushMicrotasks();
+    env.window.dispatchEvent(new env.window.Event('load'));
+    await env.clock.tickAsync(2000);
+    await flushMicrotasks();
+    await env.clock.tickAsync(2000);
+    await flushMicrotasks();
+
+    record('Did NOT click Just Reset while captcha unsolved', justResetClicks === 0, `clicks=${justResetClicks}`);
+    const status1 = env.getStatus();
+    record('Status surfaces the captcha-wait state',
+        status1.includes('Tick the captcha checkbox'), `status="${status1.slice(0, 80)}"`);
+
+    // Simulate the user ticking the checkbox — Cloudflare success state.
+    cfIframe.closest('.cf-turnstile').setAttribute('data-state', 'success');
+
+    await env.clock.tickAsync(2000);
+    await flushMicrotasks();
+    await env.clock.tickAsync(2000);
+    await flushMicrotasks();
+
+    record('Clicked Just Reset after captcha cleared', justResetClicks > 0, `clicks=${justResetClicks}`);
+    const successMsg = messages.find(m => m.type === 'CONTENT_RESULT' && m.success === true);
+    record('Sent CONTENT_RESULT success', !!successMsg, successMsg ? JSON.stringify(successMsg) : 'none');
+
+    env.cleanup();
+}
+
 (async () => {
     console.log('═══ JRM Reset Timer — content.js test suite ═══');
     await testCaptchaTimeout();
@@ -403,6 +464,7 @@ async function testPostClickExitDespiteModal() {
     await testCaptchaThenRecovery();
     await testWrappedButton();
     await testPostClickExitDespiteModal();
+    await testInModalCaptcha();
 
     const failed = results.filter(r => !r.pass);
     const passed = results.length - failed.length;

@@ -37,6 +37,7 @@
     let hasClickedJustResetThisSession = false;
     let lastJustResetClick = 0;
     let captchaFirstSeenAt = 0;
+    let modalCaptchaFirstSeenAt = 0;
     let monitoringStartedAt = 0;
 
     function log(msg, accentColor = '#3498db') {
@@ -82,6 +83,25 @@
             el.dispatchEvent(new MouseEvent(name, { view: window, bubbles: true, cancelable: true, buttons: 1, clientX: centerX, clientY: centerY }));
         });
         el.click();
+    }
+
+    // The "Just Reset" modal can include an in-modal Cloudflare Turnstile checkbox.
+    // We can't click it (cross-origin iframe) — must wait for the user to tick it,
+    // otherwise the page rejects Just Reset with "Please complete the captcha".
+    function modalCaptchaPending() {
+        // Definitive: page's own validation text shown after a rejected submit.
+        if (/Please complete the captcha|captcha verification/i.test(document.body.textContent)) return true;
+
+        // Proactive: a Turnstile widget is visible and not yet in success state.
+        const tsIframe = document.querySelector('iframe[src*="challenges.cloudflare.com"]');
+        if (tsIframe && tsIframe.offsetWidth > 0 && tsIframe.offsetHeight > 0) {
+            const wrapper = tsIframe.closest('.cf-turnstile, [data-state]');
+            if (wrapper && wrapper.getAttribute('data-state') === 'success') return false;
+            const tokenInput = document.querySelector('input[name="cf-turnstile-response"]');
+            if (tokenInput && tokenInput.value && tokenInput.value.length > 0) return false;
+            return true;
+        }
+        return false;
     }
 
     // Distinguish a BLOCKING Cloudflare challenge from a benign Turnstile widget
@@ -200,6 +220,23 @@
                 setTimeout(scan, 800);
                 return;
             }
+
+            // The modal can require a Cloudflare Turnstile checkbox — wait for the
+            // user to tick it before submitting, otherwise the page rejects us.
+            if (modalCaptchaPending()) {
+                if (!modalCaptchaFirstSeenAt) modalCaptchaFirstSeenAt = now;
+                const elapsed = now - modalCaptchaFirstSeenAt;
+                if (elapsed > CAPTCHA_MAX_WAIT_MS) {
+                    fatalStop('modal_captcha_timeout', 'Modal captcha unsolved');
+                    return;
+                }
+                const left = Math.ceil((CAPTCHA_MAX_WAIT_MS - elapsed) / 1000);
+                log(`STATUS: Tick the captcha checkbox<br>Then I'll click Just Reset (${left}s)`, "#f39c12");
+                setTimeout(scan, 1500);
+                return;
+            }
+            modalCaptchaFirstSeenAt = 0;
+
             if (now - lastJustResetClick < 5000) {
                 log("STATUS: Waiting for Just Reset to process...", "#f39c12");
                 setTimeout(scan, 1000);
@@ -278,6 +315,7 @@
             isClosing = false;
             isFatallyStopped = false;
             captchaFirstSeenAt = 0;
+            modalCaptchaFirstSeenAt = 0;
             monitoringStartedAt = 0;
             scan();
         }
