@@ -287,6 +287,58 @@ async function testCaptchaThenRecovery() {
     env.cleanup();
 }
 
+// -------- SCENARIO 6: Button wrapped in a div — must click BUTTON not wrapper --------
+async function testWrappedButton() {
+    console.log('\n[6] Reset Timer button wrapped in a div → real button gets the click, not wrapper');
+    const messages = [];
+    const env = makeSandbox({
+        html: `<!doctype html><html><head><title>JustRunMy</title></head>
+               <body>
+                 <h1>Application</h1>
+                 <p>${'lorem '.repeat(20)}</p>
+                 <div class="card"><div class="row">
+                   <span>Status: running</span>
+                   <button id="rt" class="primary"><span class="icon">⟳</span> Reset Timer</button>
+                 </div></div>
+               </body></html>`,
+        storage: { enabled: true, jrm_last_trigger_time: -60_000 },
+        captureMessages: messages
+    });
+
+    const btn = env.window.document.getElementById('rt');
+    btn.getBoundingClientRect = () => ({ left: 10, top: 10, width: 120, height: 40, right: 130, bottom: 50, x: 10, y: 10 });
+    Object.defineProperty(btn, 'offsetWidth', { value: 120, configurable: true });
+    Object.defineProperty(btn, 'offsetHeight', { value: 40, configurable: true });
+    let buttonClicks = 0;
+    btn.addEventListener('click', () => buttonClicks++);
+
+    // The wrapper divs also have the text "Reset Timer" (because of textContent inheritance).
+    // Track clicks on them to prove we did NOT click them.
+    const card = env.window.document.querySelector('.card');
+    const row = env.window.document.querySelector('.row');
+    Object.defineProperty(card, 'offsetWidth', { value: 400, configurable: true });
+    Object.defineProperty(card, 'offsetHeight', { value: 80, configurable: true });
+    Object.defineProperty(row, 'offsetWidth', { value: 400, configurable: true });
+    Object.defineProperty(row, 'offsetHeight', { value: 80, configurable: true });
+    let clickTargetTag = null;
+    card.addEventListener('click', (e) => {
+        if (!clickTargetTag) clickTargetTag = e.target.tagName;
+    });
+
+    await flushMicrotasks();
+    env.window.dispatchEvent(new env.window.Event('load'));
+    await env.clock.tickAsync(2000);
+    await flushMicrotasks();
+    await env.clock.tickAsync(2000);
+    await flushMicrotasks();
+
+    record('Actual <button> received click', buttonClicks > 0, `buttonClicks=${buttonClicks}`);
+    record('Click target was the BUTTON (not a wrapper div)',
+        clickTargetTag === 'BUTTON', `target=${clickTargetTag}`);
+
+    env.cleanup();
+}
+
 (async () => {
     console.log('═══ JRM Reset Timer — content.js test suite ═══');
     await testCaptchaTimeout();
@@ -294,6 +346,7 @@ async function testCaptchaThenRecovery() {
     await testMonitoringTimeout();
     await testHappyPath();
     await testCaptchaThenRecovery();
+    await testWrappedButton();
 
     const failed = results.filter(r => !r.pass);
     const passed = results.length - failed.length;

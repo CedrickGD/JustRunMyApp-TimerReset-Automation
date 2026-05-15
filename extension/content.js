@@ -3,8 +3,8 @@
 
     const COOLDOWN_KEY = 'jrm_last_trigger_time';
     const MANUAL_RUN_KEY = 'manual_run_pending';
-    const INITIAL_COOLDOWN_MS = 30000;
-    const MODAL_WAIT_MS = 5000;
+    const INITIAL_COOLDOWN_MS = 5000;
+    const MODAL_WAIT_MS = 3000;
     const CAPTCHA_MAX_WAIT_MS = 120000; // 2 minutes for a human to solve
     const MONITORING_MAX_MS = 60000;    // 60s with no buttons found = give up
     const SCAN_INTERVAL_MS = 1500;
@@ -47,16 +47,25 @@
     }
 
     function findTargetElement(searchText, exactMatch = false) {
-        const elements = document.querySelectorAll('button, a, span, div, [role="button"]');
-        for (let i = 0; i < elements.length; i++) {
-            const el = elements[i];
+        function matches(el) {
             const text = el.textContent;
-            if (!text) continue;
-            const matches = exactMatch ? text.trim() === searchText : text.includes(searchText);
-            if (matches) {
-                if (el.offsetWidth > 0 && el.offsetHeight > 0) {
-                    return el;
-                }
+            if (!text) return false;
+            if (!(el.offsetWidth > 0 && el.offsetHeight > 0)) return false;
+            return exactMatch ? text.trim() === searchText : text.includes(searchText);
+        }
+        // Pass 1: real click targets first — clicking a wrapper <div> doesn't trigger
+        // React's onClick on the button inside.
+        for (const sel of ['button', '[role="button"]', 'a']) {
+            for (const el of document.querySelectorAll(sel)) {
+                if (matches(el)) return el;
+            }
+        }
+        // Pass 2: fall back to text-matching containers, but prefer a clickable descendant.
+        for (const el of document.querySelectorAll('span, div')) {
+            if (matches(el)) {
+                const inner = el.querySelector('button, [role="button"], a');
+                if (inner && matches(inner)) return inner;
+                return el;
             }
         }
         return null;

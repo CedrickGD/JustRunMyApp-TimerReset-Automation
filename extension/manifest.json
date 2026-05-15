@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "JRM Reset Timer Automation",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Automatically clicks Reset Timer on JustRunMy.App",
   "permissions": [
     "nativeMessaging",
