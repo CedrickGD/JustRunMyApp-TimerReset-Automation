@@ -1,0 +1,9 @@
+{
+  "name": "com.cedrick.jrmreset",
+  "description": "JRM Reset Timer Automation Native Host",
+  "path": "launch.bat",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://YOUR_EXTENSION_ID_HERE/"
+  ]
+}

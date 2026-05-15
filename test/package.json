@@ -1,0 +1,13 @@
+{
+  "name": "jrm-reset-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node run.mjs"
+  },
+  "dependencies": {
+    "jsdom": "^25.0.0",
+    "@sinonjs/fake-timers": "^13.0.0"
+  }
+}

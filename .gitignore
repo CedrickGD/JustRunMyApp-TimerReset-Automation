@@ -1,0 +1,19 @@
+# User-specific config (contains your application ID + extension ID)
+extension/config.js
+windows-helper/config.json
+
+# Native-host runtime state (written by host.ps1 at runtime)
+native-host/config.json
+
+# Logs
+*.log
+
+# Node test deps + lockfile noise
+test/node_modules/
+
+# Editor / OS noise
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+.DS_Store

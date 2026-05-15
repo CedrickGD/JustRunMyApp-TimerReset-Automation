@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "JRM Reset Timer Automation",
+  "version": "1.0",
+  "description": "Automatically clicks Reset Timer on JustRunMy.App",
+  "permissions": [
+    "nativeMessaging",
+    "storage",
+    "tabs",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://justrunmy.app/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.svg"
+  },
+  "icons": {
+    "16": "icon.svg",
+    "48": "icon.svg",
+    "128": "icon.svg"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://justrunmy.app/panel/application/*"
+      ],
+      "js": [
+        "config.js",
+        "content.js"
+      ]
+    }
+  ]
+}

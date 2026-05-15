@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JRM Reset</title>
+    <style>
+        body {
+            width: 220px;
+            padding: 15px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f9f9f9;
+        }
+        .status {
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            text-align: center;
+        }
+        .enabled { color: #2ecc71; }
+        .disabled { color: #e74c3c; }
+        .btn {
+            width: 100%;
+            padding: 10px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            transition: opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.9; }
+        #toggleBtn { background: #3498db; color: white; }
+        #manualBtn { background: #27ae60; color: white; }
+        .hint {
+            font-size: 0.8em;
+            color: #7f8c8d;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="status">Automation: <span id="statusText">Unknown</span></div>
+    <button id="toggleBtn" class="btn">Toggle Automation</button>
+    <button id="manualBtn" class="btn">Run Reset Now</button>
+    <div class="hint">Click "Run Reset Now" to refresh and start the sequence immediately.</div>
+    <script src="config.js"></script>
+    <script src="popup.js"></script>
+</body>
+</html>
