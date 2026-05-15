@@ -175,17 +175,19 @@
 
         const modalVisible = !!document.querySelector('.modal, [class*="modal"], [class*="overlay"]');
 
-        if (!modalVisible) {
-            if (isPerfectlyFull && !hasClickedJustResetThisSession) {
-                log("STATUS: Timer already full.<br>Verified.", "#2ecc71");
-                startExitCountdown(2);
-                return;
-            }
-            if (hasClickedJustResetThisSession && isRecentlyReset) {
-                chrome.runtime.sendMessage({ type: 'CONTENT_RESULT', success: true });
-                startExitCountdown(2);
-                return;
-            }
+        // Post-click success: once we've clicked Just Reset and the timer shows the
+        // recently-reset state, we're done. Modal may still be animating out — don't
+        // wait for it, or the 5s re-click threshold will fire a redundant Just Reset.
+        if (hasClickedJustResetThisSession && isRecentlyReset) {
+            chrome.runtime.sendMessage({ type: 'CONTENT_RESULT', success: true });
+            startExitCountdown(2);
+            return;
+        }
+        // Pre-click full timer: nothing to do.
+        if (!modalVisible && isPerfectlyFull && !hasClickedJustResetThisSession) {
+            log("STATUS: Timer already full.<br>Verified.", "#2ecc71");
+            startExitCountdown(2);
+            return;
         }
 
         // 3. JUST RESET (confirm modal)

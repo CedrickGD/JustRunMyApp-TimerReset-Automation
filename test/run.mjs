@@ -30,7 +30,10 @@ function makeSandbox({ html = '<!doctype html><html><head><title>Panel</title></
 
     const clock = FakeTimers.install({
         global: window,
-        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date']
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'],
+        // Start at a non-zero time so the "never clicked yet" sentinel (lastJustResetClick = 0)
+        // doesn't collide with the current fake time.
+        now: 1_000_000
     });
     // jsdom's vm context keeps its own Date binding, so fake-timers' Date replacement
     // doesn't always reach the eval'd script. Force it.
@@ -339,6 +342,58 @@ async function testWrappedButton() {
     env.cleanup();
 }
 
+// -------- SCENARIO 7: After Just Reset click, exit immediately even if modal lingers --------
+async function testPostClickExitDespiteModal() {
+    console.log('\n[7] Clicked Just Reset; modal still animating; timer in recently-reset state → success exit, no re-click');
+    const messages = [];
+    const env = makeSandbox({
+        html: `<!doctype html><html><head><title>JustRunMy</title></head>
+               <body>
+                 <p>FREE APP TIMER 2 days 23:58 until auto-stop ${'lorem '.repeat(20)}</p>
+                 <button id="reset">Reset Timer</button>
+                 <div class="modal" id="modal">
+                   <p>Are you sure?</p>
+                   <button id="justreset">Just Reset</button>
+                   <button id="cancel">Cancel</button>
+                 </div>
+               </body></html>`,
+        // Past cooldown AND past MODAL_WAIT_MS, so Just Reset gets clicked on first scan.
+        storage: { enabled: true, jrm_last_trigger_time: -30_000 },
+        captureMessages: messages
+    });
+
+    const justReset = env.window.document.getElementById('justreset');
+    justReset.getBoundingClientRect = () => ({ left: 10, top: 10, width: 100, height: 32, right: 110, bottom: 42, x: 10, y: 10 });
+    Object.defineProperty(justReset, 'offsetWidth', { value: 100, configurable: true });
+    Object.defineProperty(justReset, 'offsetHeight', { value: 32, configurable: true });
+    let justResetClicks = 0;
+    justReset.addEventListener('click', () => justResetClicks++);
+
+    await flushMicrotasks();
+    env.window.dispatchEvent(new env.window.Event('load'));
+    // Initial scan delay + a few scan cycles to reach the success exit.
+    await env.clock.tickAsync(2000);
+    await flushMicrotasks();
+    await env.clock.tickAsync(2000);
+    await flushMicrotasks();
+
+    // Modal is STILL in the DOM (simulating an in-flight animation).
+    const modalStillThere = !!env.window.document.getElementById('modal');
+    record('Modal is still in DOM (simulating animation)', modalStillThere, `modal=${modalStillThere}`);
+    record('Just Reset was clicked exactly once (forceClick fires 2 click events, expect 2)',
+        justResetClicks === 2, `clicks=${justResetClicks}`);
+    const successMsg = messages.find(m => m.type === 'CONTENT_RESULT' && m.success === true);
+    record('Sent CONTENT_RESULT success', !!successMsg, successMsg ? JSON.stringify(successMsg) : 'no success message');
+
+    // Advance far past the 5s re-click threshold to make sure no re-click happens.
+    await env.clock.tickAsync(10_000);
+    await flushMicrotasks();
+    record('No re-click of Just Reset after 10s (would have been 4 clicks if re-fired)',
+        justResetClicks === 2, `clicks=${justResetClicks}`);
+
+    env.cleanup();
+}
+
 (async () => {
     console.log('═══ JRM Reset Timer — content.js test suite ═══');
     await testCaptchaTimeout();
@@ -347,6 +402,7 @@ async function testWrappedButton() {
     await testHappyPath();
     await testCaptchaThenRecovery();
     await testWrappedButton();
+    await testPostClickExitDespiteModal();
 
     const failed = results.filter(r => !r.pass);
     const passed = results.length - failed.length;
